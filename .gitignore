@@ -1,0 +1,7 @@
+/.bundle
+/log
+/tmp
+/spec/reports
+*.gem
+*.rbc
+.sass-cache
