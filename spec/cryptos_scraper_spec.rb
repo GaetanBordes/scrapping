@@ -1,35 +1,38 @@
-require 'httparty'
-require 'nokogiri'
+require 'rspec'
 require_relative '../lib/cryptos_scraper'
 
-RSpec.describe 'CryptoScraper' do
-  describe '#scrape_cryptos' do
-    it 'returns a non-empty array of cryptos' do
-
-      result = scrape_cryptos
-
-
+RSpec.describe 'scraper' do
+  describe '#scraper' do
+    it 'returns an array of hashes' do
+      result = scraper
       expect(result).to be_an(Array)
-      expect(result).not_to be_empty
+      expect(result.first).to be_a(Hash)
     end
 
-    it 'contains hashes with valid symbols and prices' do
-     
-      result = scrape_cryptos
+    it 'contains names and prices for each cryptocurrency' do
+      result = scraper
+      first_crypto = result.first
 
+      expect(first_crypto).to have_key(:name)
+      expect(first_crypto).to have_key(:price)
 
-      result.each do |crypto|
-        expect(crypto).to be_a(Hash)
-        expect(crypto.keys.first).to be_a(String) 
-        expect(crypto.values.first).to be_a(Float) 
-        expect(crypto.values.first).to be > 0 
+      expect(first_crypto[:name]).to be_a(String)
+      expect(first_crypto[:price]).to be_a(String)
+    end
+
+    it 'returns a list of at least 20 cryptocurrencies' do
+      result = scraper
+      expect(result.size).to be >= 20
+    end
+
+    it 'returns prices within a reasonable range' do
+      result = scraper
+      prices = result.map { |crypto| crypto[:price].gsub(/[$,]/, '').to_f }
+      
+      prices.each do |price|
+        expect(price).to be > 0
+        expect(price).to be < 1_000_000 
       end
-    end
-   it 'includes specific cryptos like Bitcoin and Ethereum' do
-      result = scrape_cryptos
-      symbols = result.map(&:keys).flatten
-      expect(symbols).to include("BTC")
-      expect(symbols).to include("ETH")
     end    
   end
 end
