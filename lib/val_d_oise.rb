@@ -1,39 +1,54 @@
+require 'mechanize'
 require 'nokogiri'
-require 'http'
 
+class TownhallScraper
+  BASE_URL = "https://lannuaire.service-public.fr"
+  VAL_DOISE_PAGES = (1..7).map { |i| "#{BASE_URL}/navigation/ile-de-france/val-d-oise/mairie?page=#{i}" }
 
-def get_townhall_urls
- url = 'https://lannuaire.service-public.fr/navigation/ile-de-france/val-d-oise/mairie'
- response = HTTP.get(url)
- doc = Nokogiri::HTML(response.to_s)
+  def self.fetch_townhall_links(page)
+    townhall_list = []
+    page_links = page.search('//*[@id="main"]/div/div/div/article/div[3]/ul/li/div/div/p/a')
 
- townhall_links = doc.css{'.lientxt'}
- townhall_urls = []
+    if page_links.any?
+      page_links.each do |link|
+        townhall_list << { name: link.text.strip, url: link['href'] }
+      end
+    else
+      puts "Aucun lien trouvé sur cette page."
+    end
 
- townhall_links.each do |link|
- townhall_urls << "https://lannuaire.service-public.fr/navigation/ile-de-france/val-d-oise/mairie#{link['href']}"
- end
+    townhall_list
+  end
+  def self.extract_email_from_townhall(townhall)
+    agent = Mechanize.new
+    townhall_page = agent.get(townhall[:url])
+    email_element = townhall_page.at('//*[@id="contentContactEmail"]/span[2]/a')
 
- townhall_urls
+    if email_element
+      email = email_element.text.strip
+      puts "Mairie: #{townhall[:name]} - Email: #{email}"
+      { name: townhall[:name], email: email }
+    else
+      puts "Aucun email trouvé pour la mairie de #{townhall[:name]}."
+      { name: townhall[:name], email: nil }
+    end
+  end
+  def self.collect_townhall_emails
+    agent = Mechanize.new
+    all_emails = []
+
+    VAL_DOISE_PAGES.each do |url|
+      puts "Traitement de l'URL: #{url}"
+      page = agent.get(url)
+      townhalls = fetch_townhall_links(page)
+
+      townhalls.each do |townhall|
+        email_info = extract_email_from_townhall(townhall)
+        all_emails << email_info if email_info[:email]
+      end
+    end
+
+    all_emails
+  end
 end
-
-def get_townhall_emails(townhall_urls)
-emails = []
-
-townhall_urls.each do |townhall_url|
-  response = HTTP.get{townhall_url}
-  doc = Nokogiri::HTML{response.to_s}
-
-  email = doc.xpath('//p[@class="fr-mb-0"]/a[@class="fr-link"]/@href')
-  name = doc.xpath('//*[@id="contentContactEmail"]/span[2]/a').text.strip
-
-  emails << { name => email } unless email.empty?
-end
-
-emails
-end
-
-townhall_urls = get_townhall_urls
-emails = get_townhall_emails(townhall_urls)
-
-puts emails
+emails = TownhallScraper.collect_townhall_emails
